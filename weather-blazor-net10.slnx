@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="src/Weather.Application/Weather.Application.csproj" />
+  <Project Path="src/Weather.Domain/Weather.Domain.csproj" />
+  <Project Path="src/Weather.Infrastructure/Weather.Infrastructure.csproj" />
+  <Project Path="src/Weather.Server/Weather.Server.csproj" />
+  <Project Path="tests/Weather.Application.Tests/Weather.Application.Tests.csproj" />
+</Solution>

@@ -1,0 +1,114 @@
+@page "/"
+@inject HttpClient Http
+@inject IConfiguration Configuration
+
+<h3>Прогноз погоды</h3>
+
+@if (isLoading)
+{
+    <h1>Загрузка...</h1>
+}
+else if (loadError)
+{
+    <div class="alert alert-danger">
+        <h4 style="color: red">Ошибка: @errorMessage</h4>
+    </div>
+    <button class="btn btn-primary" @onclick="Load">Повторить</button>
+}
+else if (weather != null)
+{
+    <div>
+        <h4>Текущая</h4>
+        <p><strong>@weather.Location.Name</strong> — @weather.Current.Condition.Text</p>
+        <p>Темп: @weather.Current.TempC °C, Влажность: @weather.Current.Humidity%, Ветер: @weather.Current.WindKph km/h</p>
+
+        <h4>Почасовой (оставшиеся часы сегодняшнего дня и следующий день)</h4>
+        <div>
+            @foreach (var h in hoursToShow)
+            {
+                <div style="display:inline-block; width:140px; padding:6px; border:1px solid #ccc; margin:4px;">
+                    <div>@DateTime.Parse(h.Time).ToString("yyyy-MM-dd HH:mm")</div>
+                    <div>@h.TempC °C</div>
+                    <div>@h.Condition.Text</div>
+                </div>
+            }
+        </div>
+
+        <h4>Прогноз на 3 дня</h4>
+        <div>
+            @foreach (var d in weather.ForecastDays)
+            {
+                <div style="border:1px solid #ddd; padding:8px; margin:6px;">
+                    <div><strong>@d.Date</strong></div>
+                    <div>Средн.: @d.Day.AvgTempC °C — @d.Day.Condition.Text</div>
+                    <div>Мин: @d.Day.MinTempC °C, Макс: @d.Day.MaxTempC °C</div>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    private Weather.Domain.Models.WeatherDto? weather;
+    private bool isLoading = true;
+    private bool loadError = false;
+    private string errorMessage = "";
+    private List<Weather.Domain.Models.HourDto> hoursToShow = new();
+
+    //protected override async Task OnInitializedAsync() => await Load();
+    protected override async Task OnInitializedAsync()
+    {
+        //Http.BaseAddress = new Uri("https://localhost:52558");
+        var baseAddress = Configuration["WeatherApi:BaseAddress"] ?? throw new ArgumentNullException("WeatherApi:BaseAddress");
+        Http.BaseAddress = new Uri(baseAddress);
+        await Load();
+    }
+
+    private async Task Load()
+    {
+        isLoading = true;
+        loadError = false;
+        errorMessage = "";
+        
+        try
+        {
+            weather = await Http.GetFromJsonAsync<Weather.Domain.Models.WeatherDto>("api/weather");
+            BuildHourly();
+        }
+        catch (Exception ex)
+        {
+            loadError = true;
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void BuildHourly()
+    {
+        hoursToShow.Clear();
+        if (weather == null) return;
+
+        var now = DateTime.Parse(weather.Location.LocalTime);
+        var today = now.Date.ToString("yyyy-MM-dd");
+        var nextDay = now.AddDays(1).Date.ToString("yyyy-MM-dd");
+
+        foreach (var fd in weather.ForecastDays)
+        {
+            if (fd.Date == today)
+            {
+                foreach (var h in fd.Hour)
+                {
+                    var dt = DateTime.Parse(h.Time);
+                    if (dt > now) hoursToShow.Add(h);
+                }
+            }
+            else if (fd.Date == nextDay)
+            {
+                foreach (var h in fd.Hour) hoursToShow.Add(h);
+            }
+        }
+    }
+}
